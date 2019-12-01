@@ -1,9 +1,11 @@
 package dayN
 
+import isDebug
 import java.io.File
 
 fun main() {
-    val name = if (true) "test.txt" else "input.txt"
+    val name = if (isDebug()) "test.txt" else "input.txt"
+    System.err.println(name)
     val dir = ::main::class.java.`package`.name
     val input = File("src/$dir/$name").readLines()
     val parsed = parse(input)

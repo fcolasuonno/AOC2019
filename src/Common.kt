@@ -1,3 +1,6 @@
+import java.lang.management.ManagementFactory
+
+
 fun <E> List<MutableList<E>>.printWith(byLines: Boolean = true, function: (E) -> String) = buildString {
     append('\n')
     if (byLines) {
@@ -36,3 +39,5 @@ class MultiMap<K1, K2, V> : HashMap<K1, MultiMap.ValueMap<K2, V>>(), MutableMap<
 
     override fun get(key: K1) = super.get(key) ?: ValueMap<K2, V>().also { put(key, it) }
 }
+
+fun isDebug() = ManagementFactory.getRuntimeMXBean().inputArguments.any { "jdwp=" in it }

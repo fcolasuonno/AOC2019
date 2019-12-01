@@ -1,10 +1,11 @@
 package day1
 
+import isDebug
 import java.io.File
-import kotlin.math.max
 
 fun main() {
-    val name = if (false) "test.txt" else "input.txt"
+    val name = if (isDebug()) "test.txt" else "input.txt"
+    System.err.println(name)
     val dir = ::main::class.java.`package`.name
     val input = File("src/$dir/$name").readLines()
     val parsed = parse(input)
