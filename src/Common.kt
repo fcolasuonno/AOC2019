@@ -41,3 +41,20 @@ class MultiMap<K1, K2, V> : HashMap<K1, MultiMap.ValueMap<K2, V>>(), MutableMap<
 }
 
 fun isDebug() = ManagementFactory.getRuntimeMXBean().inputArguments.any { "jdwp=" in it }
+
+sealed class IntCode {
+    abstract fun execute(ip: Int, mem: MutableList<Int>): Int
+    data class IndirectAddressed(val func: (Int, Int) -> Int) : IntCode() {
+        override fun execute(ip: Int, mem: MutableList<Int>): Int {
+            val dest = mem[ip + 3]
+            val noun = mem[ip + 1]
+            val verb = mem[ip + 2]
+            mem[dest] = func(mem[noun], mem[verb])
+            return ip + 4
+        }
+    }
+
+    object End : IntCode() {
+        override fun execute(ip: Int, mem: MutableList<Int>) = ip + 1
+    }
+}
