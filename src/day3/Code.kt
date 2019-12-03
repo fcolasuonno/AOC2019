@@ -21,37 +21,24 @@ data class Movement(val d: Char, val steps: Int) {
             'D' -> point.copy(y = point.y + it)
             'L' -> point.copy(x = point.x - it)
             else -> point.copy(x = point.x + it)
-        }.also { p -> p.step = point.step + it }
+        }
     }
 }
 
-data class Point(val x: Int, val y: Int) {
-    var step = 0
-}
+data class Point(val x: Int, val y: Int)
 
 fun parse(input: List<String>) = input.map {
     it.split(',').map { Movement(it.first(), it.substring(1).toInt()) }
-}.requireNoNulls()
+        .fold(mutableListOf(Point(0, 0)) as List<Point>) { path, movement -> path + movement.points(path.last()) }
+}.requireNoNulls().let { (path1, path2) -> Pair(path1, path2) }
 
-fun part1(input: List<List<Movement>>) = input.map {
-    var point = Point(0, 0)
-    it.flatMap { movement ->
-        movement.points(point).also {
-            point = it.last()
-        }
-    }
-}.let { (path1, path2) ->
-    path1.intersect(path2).map { abs(it.x) + abs(it.y) }.min()
+fun part1(input: Pair<List<Point>, List<Point>>) = input.let { (path1, path2) ->
+    path1.intersect(path2).map { abs(it.x) + abs(it.y) }.filterNot { it == 0 }.min()
 }
 
-fun part2(input: List<List<Movement>>) = input.map {
-    var point = Point(0, 0)
-    it.flatMap { movement ->
-        movement.points(point).also {
-            point = it.last()
-        }
-    }
-}.let { (path1, path2) ->
-    val seen = path2.toSet()
-    path1.filter { it in seen }.map { p -> p.step + path2.first { it == p }.step }.min()
+fun part2(input: Pair<List<Point>, List<Point>>) = input.let { (path1, path2) ->
+    val otherPath = path2.toSet()
+    path1.asSequence().withIndex().filter { it.value in otherPath }.map { intersection ->
+        intersection.index + path2.indexOf(intersection.value)
+    }.filterNot { it == 0 }.min()
 }
