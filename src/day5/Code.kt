@@ -1,6 +1,5 @@
-package day2
+package day5
 
-import IntCode
 import isDebug
 import java.io.File
 
@@ -14,9 +13,16 @@ fun main() {
     println("Part 2 = ${part2(parsed)}")
 }
 
+var currentInput = 1
 val opcodes = mapOf(
     1 to IntCode.Compute { a, b -> a + b },
     2 to IntCode.Compute { a, b -> a * b },
+    3 to IntCode.Input { currentInput },
+    4 to IntCode.Output { a -> currentInput = a },
+    5 to IntCode.Jump { a -> a != 0 },
+    6 to IntCode.Jump { a -> a == 0 },
+    7 to IntCode.Compare { a, b -> a < b },
+    8 to IntCode.Compare { a, b -> a == b },
     99 to IntCode.End
 )
 
@@ -26,20 +32,21 @@ fun parse(input: List<String>) = input.map {
 
 fun part1(input: List<List<Int>>) = input.map { orig ->
     val mem = orig.toMutableList()
-    mem[1] = 12
-    mem[2] = 2
-    generateSequence(0) { ip -> opcodes[mem[ip]]?.execute(ip, mem) }.first { opcodes[mem[it]] == IntCode.End }
-    mem.first()
+    generateSequence(0) { ip ->
+        opcodes[mem[ip] % 100]?.execute(ip, mem, mem[ip] / 100)
+    }.first {
+        opcodes[mem[it]] == IntCode.End
+    }
+    currentInput
 }
 
 fun part2(input: List<List<Int>>): Any? = input.map { orig ->
-    (0..99).flatMap { noun -> (0..99).map { verb -> noun to verb } }.first { (noun, verb) ->
-        val mem = orig.toMutableList()
-        mem[1] = noun
-        mem[2] = verb
-        generateSequence(0 to opcodes.getValue(mem[0])) { (ip, op) ->
-            op.execute(ip, mem).let { it to opcodes.getValue(mem[it]) }
-        }.first { it.second == IntCode.End }
-        mem.first() == 19690720
-    }.let { it.first * 100 + it.second }
+    currentInput = 5
+    val mem = orig.toMutableList()
+    generateSequence(0) { ip ->
+        opcodes[mem[ip] % 100]?.execute(ip, mem, mem[ip] / 100)
+    }.first {
+        opcodes[mem[it]] == IntCode.End
+    }
+    currentInput
 }

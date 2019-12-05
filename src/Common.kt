@@ -43,18 +43,59 @@ class MultiMap<K1, K2, V> : HashMap<K1, MultiMap.ValueMap<K2, V>>(), MutableMap<
 fun isDebug() = ManagementFactory.getRuntimeMXBean().inputArguments.any { "jdwp=" in it }
 
 sealed class IntCode {
-    abstract fun execute(ip: Int, mem: MutableList<Int>): Int
-    data class IndirectAddressed(val func: (Int, Int) -> Int) : IntCode() {
-        override fun execute(ip: Int, mem: MutableList<Int>): Int {
+    abstract fun execute(ip: Int, mem: MutableList<Int>, mode: Int = 0): Int
+    private fun indirect(mode: Int, position: Int) = mode / (10.pow(position - 1)) % 10 == 0
+
+    protected fun access(mem: List<Int>, ip: Int, position: Int, mode: Int) =
+        if (indirect(mode, position)) mem[mem[ip + position]] else mem[ip + position]
+
+    data class Compute(val func: (Int, Int) -> Int) : IntCode() {
+        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+            val noun = access(mem, ip, 1, mode)
+            val verb = access(mem, ip, 2, mode)
             val dest = mem[ip + 3]
-            val noun = mem[ip + 1]
-            val verb = mem[ip + 2]
-            mem[dest] = func(mem[noun], mem[verb])
+            mem[dest] = func(noun, verb)
+            return ip + 4
+        }
+    }
+
+    data class Input(val func: () -> Int) : IntCode() {
+        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+            val dest = mem[ip + 1]
+            mem[dest] = func()
+            return ip + 2
+        }
+    }
+
+    data class Output(val func: (Int) -> Unit) : IntCode() {
+        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+            val noun = access(mem, ip, 1, mode)
+            func(noun)
+            return ip + 2
+        }
+    }
+
+    data class Jump(val func: (Int) -> Boolean) : IntCode() {
+        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+            val noun = access(mem, ip, 1, mode)
+            val verb = access(mem, ip, 2, mode)
+            return if (func(noun)) verb else (ip + 3)
+        }
+    }
+
+    data class Compare(val func: (Int, Int) -> Boolean) : IntCode() {
+        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+            val noun = access(mem, ip, 1, mode)
+            val verb = access(mem, ip, 2, mode)
+            val dest = mem[ip + 3]
+            mem[dest] = if (func(noun, verb)) 1 else 0
             return ip + 4
         }
     }
 
     object End : IntCode() {
-        override fun execute(ip: Int, mem: MutableList<Int>) = ip + 1
+        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int) = ip + 1
     }
 }
+
+private fun Int.pow(exponent: Int): Int = if (exponent == 0) 1 else this * this.pow(exponent - 1)
