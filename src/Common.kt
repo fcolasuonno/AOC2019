@@ -98,4 +98,4 @@ sealed class IntCode {
     }
 }
 
-private fun Int.pow(exponent: Int): Int = if (exponent == 0) 1 else this * this.pow(exponent - 1)
+private fun Int.pow(exponent: Int): Int = (0 until exponent).fold(1) { a, _ -> a * this }
