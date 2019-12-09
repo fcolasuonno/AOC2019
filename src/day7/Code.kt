@@ -5,6 +5,8 @@ import IntCodeComputer
 import isDebug
 import permutations
 import java.io.File
+import java.util.concurrent.LinkedTransferQueue
+import kotlin.concurrent.thread
 
 fun main() {
     val name = if (isDebug()) "test.txt" else "input.txt"
@@ -30,31 +32,22 @@ fun part1(input: List<Long>) = setOf(0L, 1L, 2L, 3L, 4L).permutations.map { phas
 }.max()
 
 fun part2(program: List<Long>): Any? = setOf(9L, 8L, 7L, 6L, 5L).permutations.map { phases ->
-    val initialInput = phases.map { phase -> mutableListOf(phase) }
-    initialInput.first().add(0)
-    val amplifiers = Amplifiers(initialInput.mapIndexed { i, input ->
-        Amplifier(IntCodeComputer(program, IntCode.Input { input.removeAt(0) },
-            IntCode.Output { a -> initialInput[(i + 1) % initialInput.size].add(a) }, id = i
-        ), input
-        )
-    })
-    amplifiers.forEachRemaining {
-        //do nothing
+    val initialInput = phases.mapIndexed { i, phase ->
+        LinkedTransferQueue<Long>().apply {
+            put(phase)
+            if (i == 0) put(0)
+        }
     }
+    initialInput.mapIndexed { i, input ->
+        thread(start = true) {
+            IntCodeComputer(
+                program,
+                IntCode.Input { input.take() },
+                IntCode.Output { a -> initialInput[(i + 1) % initialInput.size].put(a) },
+                id = i
+            ).run()
+        }
+    }.forEach { it.join() }
+
     initialInput.flatten().single()
 }.max()
-
-data class Amplifier(val computer: IntCodeComputer, val input: List<Long>) : Iterator<Unit> {
-    private val sequenceIterator = computer.sequence.iterator()
-    override fun hasNext() = (input.isNotEmpty() || computer.peekOp !is IntCode.Input) && computer.peekOp != IntCode.End
-
-    override fun next() {
-        sequenceIterator.next()
-    }
-}
-
-data class Amplifiers(val amplifiers: List<Amplifier>) : Iterator<Unit> {
-    override fun hasNext() = amplifiers.any { it.hasNext() }
-
-    override fun next() = amplifiers.first { it.hasNext() }.next()
-}
