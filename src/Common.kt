@@ -43,59 +43,79 @@ class MultiMap<K1, K2, V> : HashMap<K1, MultiMap.ValueMap<K2, V>>(), MutableMap<
 fun isDebug() = ManagementFactory.getRuntimeMXBean().inputArguments.any { "jdwp=" in it }
 
 sealed class IntCode {
-    abstract fun execute(ip: Int, mem: MutableList<Int>, mode: Int = 0): Int
-    private fun indirect(mode: Int, position: Int) = mode / (10.pow(position - 1)) % 10 == 0
+    companion object {
+        var relativeBase = 0L
+    }
 
-    protected fun access(mem: List<Int>, ip: Int, position: Int, mode: Int) =
-        if (indirect(mode, position)) mem[mem[ip + position]] else mem[ip + position]
+    abstract fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long = 0): Long
+    fun indirect(mode: Long, position: Long) = mode / (10L.pow(position - 1)) % 10 == 0L
+    fun relative(mode: Long, position: Long) = mode / (10L.pow(position - 1)) % 10 == 2L
 
-    data class Compute(val func: (Int, Int) -> Int) : IntCode() {
-        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+    protected fun access(mem: Map<Long, Long>, ip: Long, position: Long, mode: Long) =
+        when {
+            indirect(mode, position) -> mem[mem[ip + position] ?: 0]
+            relative(mode, position) -> mem[(mem[ip + position] ?: 0) + relativeBase]
+            else -> mem[ip + position]
+        } ?: 0
+
+    data class Compute(val func: (Long, Long) -> Long) : IntCode() {
+        override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long): Long {
             val noun = access(mem, ip, 1, mode)
             val verb = access(mem, ip, 2, mode)
-            val dest = mem[ip + 3]
+            val dest = mem[ip + 3] ?: 0
             mem[dest] = func(noun, verb)
             return ip + 4
         }
     }
 
-    data class Input(val func: () -> Int) : IntCode() {
-        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
-            val dest = mem[ip + 1]
-            mem[dest] = func()
+    data class Input(val func: () -> Long) : IntCode() {
+        override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long): Long {
+            when {
+                indirect(mode, 1) -> mem[mem[ip + 1] ?: 0] = func()
+                relative(mode, 1) -> mem[(mem[ip + 1] ?: 0) + relativeBase] = func()
+                else -> mem[ip + 1] = func()
+            }
             return ip + 2
         }
     }
 
-    data class Output(val func: (Int) -> Unit) : IntCode() {
-        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+    data class Output(val func: (Long) -> Unit) : IntCode() {
+        override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long): Long {
             val noun = access(mem, ip, 1, mode)
             func(noun)
             return ip + 2
         }
     }
 
-    data class Jump(val func: (Int) -> Boolean) : IntCode() {
-        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+    data class Jump(val func: (Long) -> Boolean) : IntCode() {
+        override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long): Long {
             val noun = access(mem, ip, 1, mode)
             val verb = access(mem, ip, 2, mode)
             return if (func(noun)) verb else (ip + 3)
         }
     }
 
-    data class Compare(val func: (Int, Int) -> Boolean) : IntCode() {
-        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int): Int {
+    data class Compare(val func: (Long, Long) -> Boolean) : IntCode() {
+        override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long): Long {
             val noun = access(mem, ip, 1, mode)
             val verb = access(mem, ip, 2, mode)
-            val dest = mem[ip + 3]
-            mem[dest] = if (func(noun, verb)) 1 else 0
+            val dest = mem[ip + 3] ?: 0
+            mem[dest] = if (func(noun, verb)) 1L else 0L
             return ip + 4
         }
     }
 
+    object SetBase : IntCode() {
+        override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long): Long {
+            val noun = access(mem, ip, 1, mode)
+            relativeBase += noun
+            return ip + 2
+        }
+    }
+
     object End : IntCode() {
-        override fun execute(ip: Int, mem: MutableList<Int>, mode: Int) = ip + 1
+        override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long) = ip + 1
     }
 }
 
-private fun Int.pow(exponent: Int): Int = (0 until exponent).fold(1) { a, _ -> a * this }
+private fun Long.pow(exponent: Long): Long = (0 until exponent).fold(1L) { a, _ -> a * this }
