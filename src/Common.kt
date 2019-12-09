@@ -62,8 +62,11 @@ sealed class IntCode {
         override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long): Long {
             val noun = access(mem, ip, 1, mode)
             val verb = access(mem, ip, 2, mode)
-            val dest = mem[ip + 3] ?: 0
-            mem[dest] = func(noun, verb)
+            when {
+                indirect(mode, 3) -> mem[mem[ip + 3] ?: 0] = func(noun, verb)
+                relative(mode, 3) -> mem[(mem[ip + 3] ?: 0) + relativeBase] = func(noun, verb)
+                else -> mem[ip + 3] = func(noun, verb)
+            }
             return ip + 4
         }
     }
@@ -99,8 +102,11 @@ sealed class IntCode {
         override fun execute(ip: Long, mem: MutableMap<Long, Long>, mode: Long): Long {
             val noun = access(mem, ip, 1, mode)
             val verb = access(mem, ip, 2, mode)
-            val dest = mem[ip + 3] ?: 0
-            mem[dest] = if (func(noun, verb)) 1L else 0L
+            when {
+                indirect(mode, 3) -> mem[mem[ip + 3] ?: 0] = if (func(noun, verb)) 1L else 0L
+                relative(mode, 3) -> mem[(mem[ip + 3] ?: 0) + relativeBase] = if (func(noun, verb)) 1L else 0L
+                else -> mem[ip + 3] = if (func(noun, verb)) 1L else 0L
+            }
             return ip + 4
         }
     }
