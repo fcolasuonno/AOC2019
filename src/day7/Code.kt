@@ -1,6 +1,7 @@
 package day7
 
 import IntCode
+import IntCodeComputer
 import isDebug
 import permutations
 import java.io.File
@@ -19,29 +20,11 @@ fun parse(input: List<String>) = input.map {
     it.split(",").map { it.toLong() }
 }.requireNoNulls().single()
 
-val mainOpcodes = mapOf(
-    1L to IntCode.Compute { a, b -> a + b },
-    2L to IntCode.Compute { a, b -> a * b },
-    5L to IntCode.Jump { a -> a != 0L },
-    6L to IntCode.Jump { a -> a == 0L },
-    7L to IntCode.Compare { a, b -> a < b },
-    8L to IntCode.Compare { a, b -> a == b },
-    99L to IntCode.End
-)
-
 fun part1(input: List<Long>) = setOf(0L, 1L, 2L, 3L, 4L).permutations.map { phases ->
     phases.fold(0L) { inputVal, phase ->
         val inputs = mutableListOf(phase, inputVal)
         var output = 0L
-        val opcodes = mainOpcodes + mapOf(
-            3L to IntCode.Input { inputs.removeAt(0) },
-            4L to IntCode.Output { a -> output = a })
-        val mem = input.mapIndexed { index, i -> index.toLong() to i }.toMap().toMutableMap()
-        generateSequence(0L) { ip ->
-            opcodes[(mem[ip] ?: 0) % 100]?.execute(ip, mem, (mem[ip] ?: 0) / 100)
-        }.first {
-            opcodes[mem[it]] == IntCode.End
-        }
+        IntCodeComputer(input, IntCode.Input { inputs.removeAt(0) }, IntCode.Output { a -> output = a }).run()
         output
     }
 }.max()
@@ -49,31 +32,24 @@ fun part1(input: List<Long>) = setOf(0L, 1L, 2L, 3L, 4L).permutations.map { phas
 fun part2(program: List<Long>): Any? = setOf(9L, 8L, 7L, 6L, 5L).permutations.map { phases ->
     val initialInput = phases.map { phase -> mutableListOf(phase) }
     initialInput.first().add(0)
-    Amplifiers(initialInput.mapIndexed { i, input ->
-        val mem = program.mapIndexed { index, i -> index.toLong() to i }.toMap().toMutableMap()
-        val opcodes = mainOpcodes + mapOf(
-            3L to IntCode.Input { input.removeAt(0) },
-            4L to IntCode.Output { a -> initialInput[(i + 1) % initialInput.size].add(a) })
-        var wantsInput = false
-        Amplifier(generateSequence(0L) { ip ->
-            opcodes[(mem[ip] ?: 0) % 100]
-                ?.takeIf { it != IntCode.End }
-                ?.execute(ip, mem, (mem[ip] ?: 0) / 100)
-                .also {
-                    wantsInput = it != null && opcodes[(mem[it] ?: 0) % 100] is IntCode.Input
-                }
-        }.iterator()) { input.isNotEmpty() || !wantsInput }
-    }).forEachRemaining {
+    val amplifiers = Amplifiers(initialInput.mapIndexed { i, input ->
+        Amplifier(IntCodeComputer(program, IntCode.Input { input.removeAt(0) },
+            IntCode.Output { a -> initialInput[(i + 1) % initialInput.size].add(a) }, id = i
+        ), input
+        )
+    })
+    amplifiers.forEachRemaining {
         //do nothing
     }
-    initialInput.first().single()
+    initialInput.flatten().single()
 }.max()
 
-data class Amplifier(val iterator: Iterator<Long>, val canProceed: () -> Boolean) : Iterator<Unit> {
-    override fun hasNext() = canProceed() && iterator.hasNext()
+data class Amplifier(val computer: IntCodeComputer, val input: List<Long>) : Iterator<Unit> {
+    private val sequenceIterator = computer.sequence.iterator()
+    override fun hasNext() = (input.isNotEmpty() || computer.peekOp !is IntCode.Input) && computer.peekOp != IntCode.End
 
     override fun next() {
-        iterator.next()
+        sequenceIterator.next()
     }
 }
 
