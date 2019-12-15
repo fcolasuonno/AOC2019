@@ -74,6 +74,7 @@ data class IntCodeComputer(
     }
 
     fun run() = sequence.first { opcodes[mem[it]] == IntCode.End }
+    fun runWhile(function: () -> Boolean) = sequence.first { function() }
 }
 
 typealias Memory = MutableMap<Long, Long>
