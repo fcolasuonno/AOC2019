@@ -46,7 +46,7 @@ data class IntCodeComputer(
     val program: List<Long>,
     val input: IntCode.Input? = null,
     val output: IntCode.Output? = null,
-    val startingIp: Long = 0,
+    var startingIp: Long = 0,
     val id: Int = 0
 ) {
     private val opcodes = mapOf(
@@ -65,16 +65,24 @@ data class IntCodeComputer(
     val mem = program.mapIndexed { index, i -> index.toLong() to i }.toMap().toMutableMap()
     private fun op(ip: Long) = opcodes[mem[ip]?.rem(100) ?: 0]
     var peekOp: IntCode? = op(0)
-    val sequence = generateSequence(startingIp) { ip ->
-        val intCode = op(ip)
-//        System.err.println("${id} ip= $ip ${(ip..(ip + 3)).map { mem[it] }} ${intCode?.javaClass?.simpleName}")
-        intCode?.execute(ip, mem, relativeBase).also {
-            peekOp = it?.let { op(it) }
-        }
+
+    fun run() = opSequence().first { opcodes[mem[it]] == IntCode.End }.also {
+        startingIp = it
     }
 
-    fun run() = sequence.first { opcodes[mem[it]] == IntCode.End }
-    fun runWhile(function: () -> Boolean) = sequence.first { function() }
+    fun runWhile(function: IntCodeComputer.() -> Boolean) = opSequence().first { function(this) }.also {
+        startingIp = it
+    }
+
+    private fun opSequence(): Sequence<Long> {
+        return generateSequence(startingIp) { ip ->
+            val intCode = op(ip)
+            //        System.err.println("${id} ip= $ip ${(ip..(ip + 3)).map { mem[it] }} ${intCode?.javaClass?.simpleName}")
+            intCode?.execute(ip, mem, relativeBase).also {
+                peekOp = it?.let { op(it) }
+            }
+        }
+    }
 }
 
 typealias Memory = MutableMap<Long, Long>
