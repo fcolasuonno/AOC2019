@@ -2,6 +2,7 @@ package day22
 
 import isDebug
 import java.io.File
+import java.math.BigInteger
 
 fun main() {
     val name = if (isDebug()) "test.txt" else "input.txt"
@@ -15,25 +16,33 @@ fun main() {
 
 interface Shuffle {
     fun shuffle(cards: List<Int>): List<Int>
-    fun shuffleSingle(card: Long, cardSize: Long): Long
+    fun apply(offsetIncrement: Pair<BigInteger, BigInteger>, deckSize: BigInteger): Pair<BigInteger, BigInteger>
 }
 
 object Reverse : Shuffle {
     override fun shuffle(cards: List<Int>) = cards.reversed()
-    override fun shuffleSingle(card: Long, cardSize: Long) = cardSize - 1 - card
+    override fun apply(
+        offsetIncrement: Pair<BigInteger, BigInteger>,
+        deckSize: BigInteger
+    ): Pair<BigInteger, BigInteger> {
+        val (offset, increment) = offsetIncrement
+        val newIncrement = (increment * (-1).toBigInteger()).mod(deckSize)
+        val newOffset = (offset + newIncrement).mod(deckSize)
+        return newOffset to newIncrement
+    }
 }
 
 data class Cut(val n: Int) : Shuffle {
     override fun shuffle(cards: List<Int>) =
         cards.slice(cards.indices.let { it.drop((cards.size + n) % cards.size) + it.take((cards.size + n) % cards.size) })
 
-    override fun shuffleSingle(card: Long, cardSize: Long): Long {
-        val point = (cardSize + n) % cardSize
-        return if (card < point) {
-            card + cardSize - point
-        } else {
-            card - point
-        }
+    override fun apply(
+        offsetIncrement: Pair<BigInteger, BigInteger>,
+        deckSize: BigInteger
+    ): Pair<BigInteger, BigInteger> {
+        val (offset, increment) = offsetIncrement
+        val newOffset = (offset + (increment * n.toBigInteger())).mod(deckSize)
+        return newOffset to increment
     }
 }
 
@@ -46,7 +55,14 @@ data class Increment(val n: Int) : Shuffle {
         return cards.slice(l)
     }
 
-    override fun shuffleSingle(card: Long, cardSize: Long): Long = card * n % cardSize
+    override fun apply(
+        offsetIncrement: Pair<BigInteger, BigInteger>,
+        deckSize: BigInteger
+    ): Pair<BigInteger, BigInteger> {
+        val (offset, increment) = offsetIncrement
+        val newIncrement = (increment * n.toBigInteger().modInverse(deckSize)).mod(deckSize)
+        return offset to newIncrement
+    }
 }
 
 private val lineStructure1 = """deal into new stack""".toRegex()
@@ -62,4 +78,15 @@ fun parse(input: List<String>) = input.map {
 fun part1(input: List<Shuffle>, cards: List<Int> = (0..10006).toList()) =
     input.fold(cards) { c, op -> op.shuffle(c) }.indexOf(2019)
 
-fun part2(input: List<Shuffle>) = input.fold(2020L) { c, op -> op.shuffleSingle(c, 119315717514047L) }
+fun part2(input: List<Shuffle>): BigInteger {
+    //CHEATED THIS PART.. would never have found it
+    val deckSize = 119315717514047L.toBigInteger()
+    val iterations = 101741582076661L.toBigInteger()
+    val (offset, increment) = input.fold(BigInteger.ZERO to BigInteger.ONE) { c, op -> op.apply(c, deckSize) }
+    val finalIncrement = increment.modPow(iterations, deckSize)
+    val finalOffset =
+        (offset * (BigInteger.ONE - increment.modPow(iterations, deckSize)) * (BigInteger.ONE - increment).modInverse(
+            deckSize
+        )).mod(deckSize)
+    return (finalOffset + (finalIncrement * 2020.toBigInteger())).mod(deckSize)
+}
