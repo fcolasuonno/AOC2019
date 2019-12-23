@@ -61,6 +61,7 @@ data class IntCodeComputer(
         9L to IntCode.SetBase { a -> relativeBase += a },
         99L to IntCode.End
     )
+    var runCount = 0
     var relativeBase = 0L
     val mem = program.mapIndexed { index, i -> index.toLong() to i }.toMap().toMutableMap()
     private fun op(ip: Long) = opcodes[mem[ip]?.rem(100) ?: 0]
@@ -80,6 +81,7 @@ data class IntCodeComputer(
             //        System.err.println("${id} ip= $ip ${(ip..(ip + 3)).map { mem[it] }} ${intCode?.javaClass?.simpleName}")
             intCode?.execute(ip, mem, relativeBase).also {
                 peekOp = it?.let { op(it) }
+                runCount++
             }
         }
     }
